@@ -1,0 +1,187 @@
+import flet
+from flet import (
+    Page, TextField, ElevatedButton, ListView, ListTile,
+    Text, Row, IconButton, icons, AlertDialog, Switch, colors
+)
+
+
+def main(page: Page):
+    page.title = "Приложение для заметок"
+    page.window_width = 500
+    page.window_height = 650
+
+    notes = []
+    edit_index = None
+    theme_dark = False
+
+    def update_notes_view():
+        notes_list.controls.clear()
+        for idx, note in enumerate(notes):
+            if edit_index == idx:
+                # Если редактируем, показываем поле ввода + кнопки сохранить и отмена
+                edit_input = TextField(
+                    value=note,
+                    expand=True,
+                    multiline=True,
+                    max_lines=5,
+                    autofocus=True,
+                )
+
+                def save_edit(e, ix=idx, input_field=edit_input):
+                    val = input_field.value.strip()
+                    if val:
+                        notes[ix] = val
+                        nonlocal edit_index
+                        edit_index = None
+                        update_notes_view()
+                        page.update()
+                    else:
+                        dlg = AlertDialog(
+                            title=Text("Ошибка"),
+                            content=Text("Заметка не может быть пустой."),
+                            actions=[ElevatedButton("OK", on_click=lambda e: dlg.close())],
+                        )
+                        page.dialog = dlg
+                        dlg.open = True
+                        page.update()
+
+                def cancel_edit(e):
+                    nonlocal edit_index
+                    edit_index = None
+                    update_notes_view()
+                    page.update()
+
+                notes_list.controls.append(
+                    ListTile(
+                        title=edit_input,
+                        trailing=Row(
+                            [
+                                IconButton(icon=icons.DONE, tooltip="Сохранить", on_click=save_edit),
+                                IconButton(icon=icons.CLOSE, tooltip="Отмена", on_click=cancel_edit),
+                            ],
+                            spacing=0,
+                        ),
+                    )
+                )
+            else:
+                # Обычное отображение заметки с кнопками редактировать и удалить
+                notes_list.controls.append(
+                    ListTile(
+                        title=Text(note, size=16),
+                        trailing=Row(
+                            [
+                                IconButton(
+                                    icon=icons.EDIT,
+                                    tooltip="Редактировать заметку",
+                                    on_click=lambda e, ix=idx: start_edit(ix),
+                                ),
+                                IconButton(
+                                    icon=icons.DELETE,
+                                    tooltip="Удалить заметку",
+                                    on_click=lambda e, ix=idx: delete_note(ix),
+                                ),
+                            ],
+                            spacing=0,
+                        ),
+                    )
+                )
+        notes_list.update()
+
+    def start_edit(index):
+        nonlocal edit_index
+        edit_index = index
+        update_notes_view()
+        page.update()
+
+    def add_note(e):
+        note_text = note_input.value.strip()
+        if note_text:
+            notes.append(note_text)
+            note_input.value = ""
+            update_notes_view()
+            note_input.focus()
+            page.update()
+        else:
+            dlg = AlertDialog(
+                title=Text("Ошибка"),
+                content=Text("Заметка не может быть пустой."),
+                actions=[ElevatedButton("OK", on_click=lambda e: dlg.close())],
+            )
+            page.dialog = dlg
+            dlg.open = True
+            page.update()
+
+    def delete_note(index):
+        if 0 <= index < len(notes):
+            notes.pop(index)
+            nonlocal edit_index
+            if edit_index == index:
+                edit_index = None
+            elif edit_index is not None and edit_index > index:
+                # Сдвигаем индекс редактируемой заметки, если заметка выше была удалена
+                edit_index -= 1
+            update_notes_view()
+            page.update()
+
+    def toggle_theme(e):
+        nonlocal theme_dark
+        theme_dark = not theme_dark
+        apply_theme()
+
+    def apply_theme():
+        if theme_dark:
+            page.bgcolor = colors.DARK_SLATE_GRAY
+            page.color = colors.WHITE
+            page.update()
+            note_input.bgcolor = colors.BLACK12
+            note_input.color = colors.WHITE
+            add_button.bgcolor = colors.BLUE_GREY_700
+            add_button.color = colors.WHITE
+            notes_list.bgcolor = colors.DARK_SLATE_GRAY
+            notes_list.update()
+            for ctl in notes_list.controls:
+                if isinstance(ctl, ListTile):
+                    ctl.bgcolor = colors.BLACK26
+                    ctl.update()
+        else:
+            page.bgcolor = colors.WHITE
+            page.color = colors.BLACK
+            page.update()
+            note_input.bgcolor = colors.WHITE
+            note_input.color = colors.BLACK
+            add_button.bgcolor = None
+            add_button.color = None
+            notes_list.bgcolor = colors.WHITE
+            notes_list.update()
+            for ctl in notes_list.controls:
+                if isinstance(ctl, ListTile):
+                    ctl.bgcolor = None
+                    ctl.update()
+
+    # Элементы темы переключателя
+    theme_switch = Switch(label="Темная тема", on_change=toggle_theme)
+
+    note_input = TextField(
+        label="Введите заметку",
+        expand=True,
+        autofocus=True,
+        multiline=True,
+        max_lines=5,
+    )
+    add_button = ElevatedButton(text="Добавить заметку", on_click=add_note)
+
+    notes_list = ListView(expand=True, spacing=5, padding=10)
+
+    page.add(
+        Row([theme_switch], alignment="end"),
+        note_input,
+        add_button,
+        notes_list,
+    )
+
+    apply_theme()
+
+
+if __name__ == "__main__":
+    flet.app(target=main)
+
